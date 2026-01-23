@@ -42,7 +42,7 @@ WELCOME_TEXT = (
 def get_main_menu_inline():
     markup = InlineKeyboardMarkup(row_width=2)
     markup.add(
-        InlineKeyboardButton("Про проект Заработались", callback_data="menu_project"),
+        InlineKeyboardButton("Про проект", callback_data="menu_project"),
         InlineKeyboardButton("Комьюнити", callback_data="menu_community")
     )
     markup.add(

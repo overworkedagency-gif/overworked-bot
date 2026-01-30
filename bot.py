@@ -1,298 +1,453 @@
-# Telegram-бот "Заработались"
-# Библиотека: pyTelegramBotAPI (telebot)
-# Установка: pip3 install pyTelegramBotAPI
-
+import os
 import telebot
-from telebot.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
-
-BOT_TOKEN = '8453804590:AAGekhTUAaY8MwXVn3HKKfWRdv58bmMI_4Q' # ← ТОКЕН ОТ @BotFather
-OWNER_CHAT_ID = -1003589420810      # ← Telegram ID (число)
-
-bot = telebot.TeleBot(BOT_TOKEN)
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime
 
+BOT_TOKEN ="8453804590:AAFbFw4Y-AvCR2B-ZUZ638NStOhMcMEXxqM"
+
+GROUP_CHAT_ID = -1003589420810
+
+THREAD_PD_CONSENT     = 87   # согласие на рассылку / ПД
+THREAD_COMMUNITY_JOIN = 89   # вступление в сообщество
+THREAD_CONSULT_APP    = 88   # новая заявка на консультацию
+
+
+bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+
 # Состояния
-STATE_NONE            = 0
-STATE_NAME            = 1
-STATE_EXPERIENCE      = 2
-STATE_EDUCATION       = 3
-STATE_REQUEST         = 4
-STATE_RESUME_LINK     = 5
-STATE_RESUME_CONFIRM  = 6
-STATE_COMMUNITY_ASK   = 7
+STATE_NONE = 0
+STATE_NAME = 1
+STATE_EXPERIENCE = 2
+STATE_EDUCATION = 3
+STATE_REQUEST = 4
+STATE_RESUME_LINK = 5
+STATE_RESUME_ACCESS_CHECK = 6
+STATE_CONSULTANT_CHOICE = 7
+STATE_CONFIRM_APPLICATION = 8
 
 user_states = {}
-user_data   = {}
-
+user_data = {}
 
 WELCOME_TEXT = (
-    "Что умеет этот бот?\n"
-    "Привет!\n"
-    "Это бот проекта «Заработались».\n"
-    "Мы помогаем расти в карьере и зарабатывать больше.\n\n"
-    "• Узнать подробнее про проект\n"
-    "• Вступить в комьюнити\n"
-    "• Записаться на консультацию\n"
-    "• Послушать подкаст\n\n"
-    "Чтобы начать пользоваться — напиши или нажми /start"
+    "Привет! 🌿\n"
+    "Очень рада видеть тебя в <b>«Заработались»</b> 💛\n\n"
+    "Это тёплое место, где мы говорим о карьере без выгорания.\n"
+    "Обсуждаем , как расти профессионально, но при этом не выгорать, не ломать себя "
+    "и слышать свои настоящие «хочу» и «могу».\n\n"
+    "Здесь у нас:\n\n"
+    "🎙️ <b>подкаст</b> — честные, без розовых очков разговоры о работе, важных поворотах, "
+    "деньгах, ценностях и о том, как найти свой путь среди всей этой неопределённости\n\n"
+    "🫂 <b>уютное сообщество</b> — где собираются классные люди из самых разных сфер и этапов. "
+    "Поддерживаем друг друга, делимся опытом, ищем вместе устойчивый и честный путь "
+    "в этом быстро крутящемся мире\n\n"
+    "🎯 <b>индивидуальное карьерное консультирование</b> — когда хочется сесть, спокойно "
+    "разобрать свою ситуацию, понять, куда дальше и сделать шаги, которые правда твои\n\n"
+    "Заходи, устраивайся поудобнее ☕\n"
+    "Тут тебе всегда рады ✨"
 )
-
 
 def get_main_menu_inline():
     markup = InlineKeyboardMarkup(row_width=2)
     markup.add(
-        InlineKeyboardButton("Про проект", callback_data="menu_project"),
-        InlineKeyboardButton("Комьюнити", callback_data="menu_community")
+        InlineKeyboardButton("🫂 Сообщество", callback_data="menu_community")
     )
     markup.add(
-        InlineKeyboardButton("Консультации", callback_data="menu_consult"),
-        InlineKeyboardButton("Подкаст", callback_data="menu_podcast")
+        InlineKeyboardButton("🎯 Консультации", callback_data="menu_consult"),
+        InlineKeyboardButton("🎙️ Подкаст", callback_data="menu_podcast")
     )
     return markup
 
 
-def send_main_menu_message(uid):
+def send_main_menu(uid):
     bot.send_message(
         uid,
-        "Ты в главном меню, выбери ниже, что тебе было бы ещё интересно узнать о проекте",
+        "Выбери, что тебя интересует:",
         reply_markup=get_main_menu_inline()
     )
+
+
+def get_consult_format_inline():
+    markup = InlineKeyboardMarkup(row_width=1)
+    markup.add(
+        InlineKeyboardButton("Разбор резюме", callback_data="consult_format_resume"),
+        InlineKeyboardButton("Тестовое HR-собеседование", callback_data="consult_format_interview"),
+        InlineKeyboardButton("Карьерная консультация", callback_data="consult_format_consultation"),
+        InlineKeyboardButton("Выход на рынок труда", callback_data="consult_format_market"),
+    )
+    return markup
 
 
 @bot.message_handler(commands=['start'])
 def cmd_start(message):
     uid = message.chat.id
-
-    consent_text = (
-        "Прежде, чем узнать об исследовании больше, просим вас подтвердить согласие с политикой обработки персональных данных:\n\n"
-        "https://docs.google.com/document/d/1b9SE68JUncTm57EWK3xF0zVF2f0udLZKpSxRTgFuVDk/edit?usp=sharing\n\n"
-        "Нажмите кнопку ниже:"
-    )
-
-    markup = InlineKeyboardMarkup(row_width=2)
-    markup.add(
-        InlineKeyboardButton("Даю согласие", callback_data="consent_pd_yes"),
-        InlineKeyboardButton("Не даю согласие", callback_data="consent_pd_no")
-    )
-
-    bot.send_message(uid, consent_text, reply_markup=markup)
-
-
-@bot.message_handler(commands=['menu'])
-def cmd_menu(message):
-    send_main_menu_message(message.chat.id)
-
-
-@bot.message_handler(commands=['getid'])
-def cmd_getid(message):
-    bot.reply_to(message, f"Chat ID этого чата: `{message.chat.id}`", parse_mode='Markdown')
+    bot.send_message(uid, WELCOME_TEXT)
+    send_main_menu(uid)
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
-    uid = call.message.chat.id
+    uid = call.from_user.id
     data = call.data
 
-    bot.answer_callback_query(call.id)
+    try:
+        bot.answer_callback_query(call.id)
+    except:
+        pass
 
-    # Согласие на обработку ПДн
-    if data in ["consent_pd_yes", "consent_pd_no"]:
-        if data == "consent_pd_yes":
-            bot.edit_message_text(
-                chat_id=uid,
-                message_id=call.message.message_id,
-                text="Спасибо за согласие на обработку персональных данных! 🧡"
-            )
-
-            # Второй этап — согласие на рассылку
-            mailing_text = (
-                "Также просим подтвердить согласие на получение рекламной рассылки от проекта:\n\n"
-                "https://docs.google.com/document/d/1kLMLZ2gjpyzvri--zqRw6Usr1t5wPrJ-6CCcDMy7JFA/edit?usp=sharing\n\n"
-                "Нажмите кнопку ниже:"
-            )
-
-            markup = InlineKeyboardMarkup(row_width=2)
-            markup.add(
-                InlineKeyboardButton("Даю согласие", callback_data="consent_mailing_yes"),
-                InlineKeyboardButton("Не даю согласие", callback_data="consent_mailing_no")
-            )
-
-            bot.send_message(uid, mailing_text, reply_markup=markup)
-        else:
-            bot.edit_message_text(
-                chat_id=uid,
-                message_id=call.message.message_id,
-                text="Хорошо, мы уважаем ваш выбор.\nЕсли передумаете — напишите /start заново."
-            )
-            bot.send_message(uid, " ", reply_markup=ReplyKeyboardRemove())
-        return
-
-    # Согласие на рассылку
-    if data in ["consent_mailing_yes", "consent_mailing_no"]:
-        if data == "consent_mailing_yes":
-            bot.edit_message_text(
-                chat_id=uid,
-                message_id=call.message.message_id,
-                text="Спасибо за согласие на рассылку! Теперь вы будете получать полезные обновления и предложения от проекта."
-            )
-        else:
-            bot.edit_message_text(
-                chat_id=uid,
-                message_id=call.message.message_id,
-                text="Хорошо, мы не будем присылать вам рассылку."
-            )
-
-        # В любом случае — переходим в главное меню
-        user_states[uid] = STATE_NONE
-        send_main_menu_message(uid)
-        return
-
-    # Главное меню — Inline-кнопки
+    # Главное меню
     if data.startswith("menu_"):
-        bot.edit_message_reply_markup(chat_id=uid, message_id=call.message.message_id, reply_markup=None)
+        try:
+            bot.edit_message_reply_markup(uid, call.message.message_id, reply_markup=None)
+        except:
+            pass
 
-        if data == "menu_project":
-            bot.send_message(uid, "Здесь подробное описание проекта Заработались.\n(вставьте ваш текст)")
-            send_main_menu_message(uid)
-
-        elif data == "menu_community":
+        if data == "menu_community":
+            photo_url = "https://drive.google.com/uc?export=view&id=1x797hV2NSdpwqUD7Ib_iEC63p4M7R5J9"
+            # Короткая подпись к фото (чтобы не превысить лимит 1024 символа)
+            short_caption = "<b>«Заработались» — тёплое сообщество карьерной поддержки 🧡 </b>"
             community_text = (
-                "Наше комьюнити — это закрытое сообщество участников проекта «Заработались».\n\n"
-                "Здесь ты сможешь:\n"
-                "• Общаться с единомышленниками\n"
-                "• Получать эксклюзивные материалы и обновления\n"
-                "• Задавать вопросы экспертам\n"
-                "• Делиться результатами и опытом\n\n"
-                "(дополните текст)"
+                "Здесь собрались специалисты из разных сфер и этапов — от джунов до опытных профи.\n\n "
+                "Вместе мы:\n"
+                "🌱 обсуждаем стратегии роста, смену ролей и выход на рынок без хаоса\n"
+                "📄 прокачиваем резюме, портфолио и самопрезентацию\n"
+                "💸 говорим про деньги, грейды и переговоры\n"
+                "📊 смотрим на реальный рынок и требования\n"
+                "🤖 используем ИИ в карьерных задачах\n"
+                "🧩 разбираем твои конкретные ситуации\n"
+                "👀 даём честную обратную связь с разных сторон\n\n"
+                "<b>Мы проводим офлайн-встречи и мастермаинды в разных городах и укрепляем нетворкинг☕ </b>\n\n"
+                "Наша миссия — объединять людей и помогать раскрывать их карьерный потенциал. "
+                "Если откликается — нам точно по пути 💛\n\n"
+                "<b> ⚡ Только до 1 мая — полностью бесплатный доступ ко всем функциям сообщества!</b>🔥\n"
             )
+            try:bot.send_photo(uid,photo=photo_url,caption=short_caption,parse_mode="HTML")
+            except Exception as e:
+                print(f"Ошибка отправки фото сообщества: {e}")
+                # Если фото не загрузилось — отправляем просто текст
+                bot.send_message(uid, short_caption, parse_mode="HTML")
 
+            # Отправляем полный текст описания
+            bot.send_message(uid, community_text, parse_mode="HTML")
+            # Кнопки "Да, хочу вступить / Пока нет"
             markup = InlineKeyboardMarkup(row_width=2)
             markup.add(
-                InlineKeyboardButton("Да, вступить", callback_data="join_community"),
-                InlineKeyboardButton("Назад в меню", callback_data="back_to_main")
-            )
-
-            bot.send_message(uid, community_text)
-            bot.send_message(uid, "Хочешь вступить в комьюнити?", reply_markup=markup)
-            return
-
-        elif data == "menu_consult":
-            consult_text = (
-                "Мы проводим индивидуальные консультации по темам проекта.\n\n"
-                "Хочешь записаться? Выбери тип ниже ↓"
-            )
-
-            markup = InlineKeyboardMarkup(row_width=2)
-            markup.add(
-                InlineKeyboardButton("Карьерная консультация", callback_data="consult_type_career"),
-                InlineKeyboardButton("Разбор резюме", callback_data="consult_type_resume")
-            )
-            markup.add(
-                InlineKeyboardButton("Карьерная стратегия", callback_data="consult_type_strategy"),
-                InlineKeyboardButton("Свой вариант", callback_data="consult_type_custom")
-            )
-            markup.add(
-                InlineKeyboardButton("Назад к меню", callback_data="back_to_main")
-            )
-
-            bot.send_message(uid, consult_text, reply_markup=markup)
+                InlineKeyboardButton("Да, хочу вступить", callback_data="community_join_yes"),
+                InlineKeyboardButton("Пока нет", callback_data="community_join_no")
+                )
+            bot.send_message(uid, "Хочешь вступить в сообщество прямо сейчас?", reply_markup=markup)
             return
 
         elif data == "menu_podcast":
-            pod_text = (
-                "Слушай наш подкаст на удобных платформах:\n\n"
-                "• Spotify → https://...\n"
-                "• Apple Podcasts → https://...\n"
-                "• Яндекс.Музыка → https://...\n"
-                "• Telegram-канал → @ваш_канал"
+            photo_url = "https://drive.google.com/uc?export=view&id=1AZAp0rpzOv_QgTyIOmhDXw1mcwYzL94z"
+            short_caption = "<b>«Заработались»</b> — подкаст, где мы говорим о работе без прикрас,обсуждаем достижения, провалы и, конечно, как не потерять себя в ежедневной гонке.\n\n"
+            podcast_text = (
+                "В каждом выпуске болтаем с крутыми экспертами и практиками (IT, digital, менеджмент, психология, нейробиология, карьерные коучи) про самое живое:\n"
+                "🌱 как строить карьеру, которая питает, а не истощает\n"
+                "🗣️ эффективную коммуникацию и отношения в команде\n"
+                "🚀 ведение проектов — корпоративных и своих личных\n"
+                "🤝 баланс между бизнесом и человеческим фактором\n\n"
+                "Учимся вписывать амбиции в реальность рынка, расти без выгорания и делать себя главным проектом своей жизни.\n\n"
+                "<b>Включай, если чувствуешь: «Я окончательно заработался на своей любимой работе...»</b> 😅\n\n")
+            try:
+                bot.send_photo(uid,photo=photo_url,caption=short_caption,parse_mode="HTML")
+            except Exception as e:
+                print(f"Ошибка отправки фото подкаста: {e}")
+                bot.send_message(uid, short_caption, parse_mode="HTML")
+
+            bot.send_message(uid, podcast_text, parse_mode="HTML")
+
+            # Кнопки со ссылками + "Обратно в меню"
+            markup = InlineKeyboardMarkup(row_width=1)
+            markup.add(
+                InlineKeyboardButton(
+                    "Слушать на Яндекс Музыке",
+                    url="https://music.yandex.com/album/33028086?dir=desc&activeTab=about"
+                )
             )
-            bot.send_message(uid, pod_text)
-            send_main_menu_message(uid)
+            markup.add(
+                InlineKeyboardButton(
+                    "Слушать на Apple Podcasts",
+                    url="https://podcasts.apple.com/ru/podcast/%D0%BA%D0%B5%D0%BC-%D1%8F-%D0%BC%D0%B5%D1%87%D1%82%D0%B0%D1%8E-%D1%81%D1%82%D0%B0%D1%82%D1%8C/id1764912319"
+                )
+            )
+            markup.add(
+                InlineKeyboardButton(
+                    "Смотреть на YouTube",
+                    url="https://www.youtube.com/@over_worked"
+                )
+            )
+            markup.add(
+                InlineKeyboardButton(
+                    "Смотреть на RuTube",
+                    url="https://rutube.ru/channel/47932583/"
+                )
+            )
+            markup.add(
+                InlineKeyboardButton(
+                    "Подписаться на Telegram-канал",
+                    url="https://t.me/overworked_community"
+                )
+            )
+            markup.add(
+                InlineKeyboardButton(
+                    "← Обратно в меню",
+                    callback_data="back_to_menu"   # или любое другое значение, которое уже обрабатывается
+                )
+            )
 
-    # Вступление в комьюнити
-    if data == "join_community":
-        bot.edit_message_reply_markup(chat_id=uid, message_id=call.message.message_id, reply_markup=None)
+            bot.send_message(
+                uid,
+                "Где удобно слушать/смотреть? 👇\n\nИли вернись в главное меню:",
+                reply_markup=markup
+            )
+            return
 
-        now = datetime.now().strftime("%d.%m.%Y %H:%M")
+        elif data == "menu_consult":
+            # Прямая ссылка на твою картинку
+            photo_url = "https://drive.google.com/uc?export=view&id=1Qgk4mc_02Wg2IK7E3fAOvUb5Wu9BPOux"
+            # Короткий caption к фото (до 1024 символов)
+            short_caption = "Для начала — расскажем подробнее про форматы консультаций, чтобы ты выбрал(а) то, что даст максимальный результат:"
+            consult_text =(
+                "✨ <b> Вариант 1 — Разбор резюме (документ с комментариями) — 2000 ₽</b>\n"
+                "Хочешь быстро усилить резюме и сделать его “продающим” под вакансии.\n"
+                "Что входит:\n"
+                "• детальный разбор резюме со всеми правками и комментариями прямо в документе\n"
+                "• рекомендации, что исправить/добавить, чтобы чаще приглашали на собеседования\n"
+                "• общение в чате в Telegram + ответы на твои вопросы\n\n"
+                "⚡️️ <b> Вариант 2 — Тестовое HR-собеседование (40 минут, онлайн-звонок) — 3000 ₽</b>\n"
+                "Что будет:\n"
+                "• живое тестовое интервью как на реальном HR-скрининге\n"
+                "• самые популярные вопросы + индивидуальные вопросы под твою сферу и опыт\n"
+                "• разбор твоих ответов: как отвечать сильнее и увереннее\n"
+                "• понимание, что именно ждёт HR и как успешно пройти скрининг\n\n"
+                "🚀 <b> Вариант 3 — Карьерная консультация (40 минут, онлайн-звонок) — 3500 ₽</b>\n"
+                "Если нужен план действий и стратегия поиска работы, а не просто “поправить резюме”.\n"
+                "Что входит:\n"
+                "• разбор резюме и внесение актуальных правок\n"
+                "• разбор стратегии поиска работы (куда и как откликаться, как выделиться среди кандидатов)\n"
+                "• ответы на любые вопросы в течение 24 часов после консультации\n\n"
+                "🔥 <b> Вариант 4 — “Выход на рынок труда” (60 минут, онлайн-звонок) — 5000 ₽</b>\n"
+                "Максимальный пакет “под ключ”, чтобы уверенно выйти на рынок и начать получать офферы.\n"
+                "Что входит:\n"
+                "• разбор резюме со всеми комментариями и правками\n"
+                "• разбор сопроводительного письма (чтобы оно реально работало)\n"
+                "• тестовое HR-собеседование\n"
+                "• разбор стратегии поиска работы\n"
+                "• ответы на любые вопросы в течение 48 часов\n\n")
+            try:
+                bot.send_photo(
+                uid,
+                photo=photo_url,
+                caption=short_caption,
+                parse_mode="HTML")
+            except Exception as e:
+                print(f"Ошибка отправки фото: {e}")
+                # Если фото не загрузилось — отправляем просто текст
+                bot.send_message(uid, short_caption, parse_mode="HTML")
+            bot.send_message(uid, consult_text, parse_mode="HTML")
+            markup = InlineKeyboardMarkup(row_width=2)
+            markup.add(
+                InlineKeyboardButton("Да, хочу", callback_data="want_consult_yes"),
+                InlineKeyboardButton("Не сейчас", callback_data="want_consult_no")
+            )
+            bot.send_message(uid, "Хочешь оставить заявку на консультацию?", reply_markup=markup)
+            return
+
+    # Комьюнити: да/нет
+    if data in ["community_join_yes", "community_join_no"]:
+        try:
+            bot.edit_message_reply_markup(uid, call.message.message_id, reply_markup=None)
+        except:
+            pass
+
+        if data == "community_join_no":
+            bot.send_message(uid, "Хорошо, возвращаемся в меню.")
+            send_main_menu(uid)
+            return
+
+        username = call.from_user.username
+        username_str = f"@{username}" if username else f"ID {uid}"
+        join_text = (
+            "Отлично! Вот ссылка на наше сообщество:\n"
+            "https://t.me/+тут_твоя_ссылка_на_чат\n\n"
+            "Приятного общения! ✨"
+        )
+        bot.send_message(uid, join_text)
+
+        notify_text = (
+            f"💟 Новый участник cообщества!\n"
+            f"Пользователь: {username_str}\n"
+            f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        )
+        try:
+            bot.send_message(
+                chat_id=GROUP_CHAT_ID,
+                text=notify_text,
+                message_thread_id=THREAD_COMMUNITY_JOIN
+            )
+        except Exception as e:
+            print(f"Ошибка отправки уведомления о сообществе: {e}")
+
+        send_main_menu(uid)
+        return
+
+    # Заявка — хочу / не хочу
+    if data in ["want_consult_yes", "want_consult_no"]:
+        if data == "want_consult_no":
+            send_main_menu(uid)
+            return
+
+        try:
+            bot.delete_message(uid, call.message.message_id)
+        except:
+            pass
 
         bot.send_message(
             uid,
-            "Отлично! Вот ссылка для вступления:\n"
-            "https://t.me/+clgaWMRXw0lkNTYy\n\n"
-            "Ждём тебя внутри! 🧡"
+            "Выбери формат, который на данный момент тебя интересует:",
+            reply_markup=get_consult_format_inline()
         )
-
-        send_community_join_notification(uid, now)
-
-        send_main_menu_message(uid)
         return
 
-    # Назад в главное меню
-    if data == "back_to_main":
-        bot.edit_message_reply_markup(chat_id=uid, message_id=call.message.message_id, reply_markup=None)
-        send_main_menu_message(uid)
+    # Выбор формата → сразу к имени (без ПД)
+    if data in ["consult_format_resume", "consult_format_interview", "consult_format_consultation", "consult_format_market"]:
+        format_map = {
+            "consult_format_resume": "Разбор резюме",
+            "consult_format_interview": "Тестовое HR-собеседование",
+            "consult_format_consultation": "Карьерная консультация",
+            "consult_format_market": "Выход на рынок труда",
+        }
+        user_data.setdefault(uid, {})
+        user_data[uid]["consult_format"] = format_map[data]
+
+        try:
+            bot.edit_message_reply_markup(uid, call.message.message_id, reply_markup=None)
+        except:
+            pass
+
+        bot.send_message(uid, "Подскажи, как к тебе можно обращаться?")
+        user_states[uid] = STATE_NAME
         return
+        # Проверка доступа к резюме
+    if data in ["resume_access_yes", "resume_access_no"]:
+        try:
+            bot.edit_message_text(
+                "Отлично, спасибо что проверил(а) доступ!" if data == "resume_access_yes" else "Хорошо, тогда пропустим резюме.",
+                uid,
+                call.message.message_id
+            )
+        except Exception:
+            bot.send_message(uid,
+                             "Отлично, спасибо что проверил(а) доступ!" if data == "resume_access_yes" else "Хорошо, тогда пропустим резюме.")
 
-    # Выбор типа консультации
-    if data.startswith("consult_type_"):
-        consult_type = ""
-        if data == "consult_type_career":
-            consult_type = "Карьерная консультация"
-        elif data == "consult_type_resume":
-            consult_type = "Разбор резюме"
-        elif data == "consult_type_strategy":
-            consult_type = "Карьерная стратегия"
-        elif data == "consult_type_custom":
-            consult_type = "Свой вариант"
+        if data == "resume_access_no":
+            user_data[uid]['resume_link'] = "не прикреплялось"
 
-        user_data[uid] = user_data.get(uid, {})
-        user_data[uid]['consult_type'] = consult_type
-
-        bot.answer_callback_query(call.id, f"Выбрано: {consult_type}")
-        bot.edit_message_reply_markup(chat_id=uid, message_id=call.message.message_id, reply_markup=None)
-
-        bot.send_message(uid, "Опиши кратко свой опыт работы:")
-        user_states[uid] = STATE_EXPERIENCE
-        return
-
-    # Подтверждение доступа к резюме
-    if data == "resume_checked":
-        bot.edit_message_reply_markup(chat_id=uid, message_id=call.message.message_id, reply_markup=None)
-
+        # Показываем выбор консультанта
+        consultants_text = (
+            "На данный момент консультации проводят Аня и Лера. Давай познакомим тебя с ними поближе:\n\n"
+            "<b>Аня</b> — руководитель проектов и HR в КванторФорм.\n"
+            "Пишет курсы для менеджеров в Яндекс Практикуме, а также является ментором в программе «Women in Tech»\n"
+            "Аня ведёт канал про менеджмент и поиск работы: @itspolikarpova — там рассказывает обо всём подробнее.\n"
+            "Отзывы о консультациях Ани: @review_poliikarpova\n\n"
+            "<i>Она считает, что можно всего добиться, когда у тебя есть план и календарь! Её хобби — путешествия и обучение</i>\n\n"
+            "<b>Лера</b> — карьерный консультант, HR-эксперт и менеджер в Яндекс Практикуме.\n"
+            "@career_tet_a_tet — тут размышляет о работе и жизни в эпоху перемен.\n"
+            "<i>Адепт карьерного развития через ценности, нетворкинг и бережную реализацию амбиций. В свободное от консультаций время ходит на пилатес и растит кота Ластика🤍</i>\n\n"
+            "Выбери, пожалуйста, хочешь ли на консультацию к конкретному специалисту или подойдёт любой из них."
+        )
         markup = InlineKeyboardMarkup(row_width=3)
         markup.add(
             InlineKeyboardButton("Аня", callback_data="consultant_anya"),
             InlineKeyboardButton("Лера", callback_data="consultant_lera"),
             InlineKeyboardButton("Любой", callback_data="consultant_any")
         )
-
-        bot.send_message(uid, "Если вы хотите конкретно к Ане или Лере — выберите ниже, иначе нажмите «Любой»", reply_markup=markup)
+        bot.send_message(uid, consultants_text, reply_markup=markup)
+        user_states[uid] = STATE_CONSULTANT_CHOICE
         return
 
     # Выбор консультанта
     if data in ["consultant_anya", "consultant_lera", "consultant_any"]:
-        consultant = ""
-        if data == "consultant_anya":
-            consultant = "Аня"
-        elif data == "consultant_lera":
-            consultant = "Лера"
-        else:
-            consultant = "Любой"
-
+        consultant = {"consultant_anya": "Аня", "consultant_lera": "Лера", "consultant_any": "Любой"}[data]
+        user_data.setdefault(uid, {})
         user_data[uid]['consultant'] = consultant
 
-        bot.answer_callback_query(call.id, f"Выбрано: {consultant}")
-        bot.edit_message_reply_markup(chat_id=uid, message_id=call.message.message_id, reply_markup=None)
+        try:
+            bot.delete_message(uid, call.message.message_id)
+        except:
+            pass
 
-        send_application(uid)
-        bot.send_message(
-            uid,
-            "Заявка отправлена! Спасибо.\nМы свяжемся с вами в течение недели."
+        preview_text = (
+            "Отлично, проверь свою заявку:\n\n"
+            f"Формат: {user_data[uid].get('consult_format', '—')}\n"
+            f"Имя: {user_data[uid].get('name', '—')}\n"
+            f"Опыт: {user_data[uid].get('experience', '—')}\n"
+            f"Образование: {user_data[uid].get('education', '—')}\n"
+            f"Запрос: {user_data[uid].get('request', '—')}\n"
+            f"Резюме: {user_data[uid].get('resume_link', 'не указано')}\n"
+            f"Желаемый консультант: {consultant}\n"
         )
-        del user_states[uid]
+        markup = InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            InlineKeyboardButton("Отправить заявку", callback_data="confirm_send_app"),
+            InlineKeyboardButton("Вернуться в меню", callback_data="back_to_menu")
+        )
+        bot.send_message(uid, preview_text, reply_markup=markup)
+        user_states[uid] = STATE_CONFIRM_APPLICATION
+        return
+
+    # Подтверждение и отправка заявки
+    if data == "confirm_send_app":
+        try:
+            bot.delete_message(uid, call.message.message_id)
+        except:
+            pass
+
+        username = call.from_user.username
+        username_str = f"@{username}" if username else f"ID {uid}"
+
+        app_text = (
+            f"❗️ НОВАЯ ЗАЯВКА НА КОНСУЛЬТАЦИЮ\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"Формат: {user_data[uid].get('consult_format', '—')}\n"
+            f"Имя: {user_data[uid].get('name', '—')}\n"
+            f"Опыт: {user_data[uid].get('experience', '—')}\n"
+            f"Образование: {user_data[uid].get('education', '—')}\n"
+            f"Запрос: {user_data[uid].get('request', '—')}\n"
+            f"Резюме: {user_data[uid].get('resume_link', 'не указано')}\n"
+            f"Желаемый консультант: {user_data[uid].get('consultant', '—')}\n"
+            f"Пользователь: {username_str}\n"
+            f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M')}"
+        )
+
+        try:
+            bot.send_message(
+                chat_id=GROUP_CHAT_ID,
+                text=app_text,
+                message_thread_id=THREAD_CONSULT_APP
+            )
+            bot.send_message(
+                uid,
+                "Заявка отправлена! Скоро мы с тобой свяжемся"
+            )
+        except Exception as e:
+            print(f"Ошибка отправки заявки: {e}")
+            bot.send_message(uid, "Не удалось отправить заявку 😔\nНапиши /start и попробуй ещё раз.")
+
         user_data.pop(uid, None)
-        send_main_menu_message(uid)
+        user_states[uid] = STATE_NONE
+        send_main_menu(uid)
+        return
+
+    if data == "back_to_menu":
+        try:
+            bot.delete_message(uid, call.message.message_id)
+        except:
+            pass
+        bot.send_message(uid, "Хорошо, возвращаемся в главное меню.")
+        user_data.pop(uid, None)
+        user_states[uid] = STATE_NONE
+        send_main_menu(uid)
         return
 
 
@@ -301,113 +456,53 @@ def handle_text(message):
     uid = message.chat.id
     text = message.text.strip()
 
-    # Первый контакт — WELCOME
-    if uid not in user_states:
-        markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
-        markup.add(KeyboardButton("/start"))
-        bot.send_message(uid, WELCOME_TEXT, reply_markup=markup)
+    if uid not in user_states or user_states[uid] == STATE_NONE:
+        send_main_menu(uid)
         return
 
-    # Обработка состояний (заявка)
-    if uid in user_states and user_states[uid] != STATE_NONE:
-        state = user_states[uid]
+    state = user_states.get(uid)
 
-        if state == STATE_NAME:
-            user_data[uid]['name'] = text
-            bot.send_message(uid, "Опиши кратко свой опыт работы:")
-            user_states[uid] = STATE_EXPERIENCE
+    if state == STATE_NAME:
+        user_data.setdefault(uid, {})
+        user_data[uid]['name'] = text
+        bot.send_message(uid, "Кратко опиши свой опыт работы:")
+        user_states[uid] = STATE_EXPERIENCE
 
-        elif state == STATE_EXPERIENCE:
-            user_data[uid]['experience'] = text
-            bot.send_message(uid, "Укажите ваше образование:")
-            user_states[uid] = STATE_EDUCATION
+    elif state == STATE_EXPERIENCE:
+        user_data[uid]['experience'] = text
+        bot.send_message(uid, "Какое у тебя образование?")
+        user_states[uid] = STATE_EDUCATION
 
-        elif state == STATE_EDUCATION:
-            user_data[uid]['education'] = text
-            bot.send_message(uid, "Напишите ваш запрос на консультацию, чем подробнее тем лучше!")
-            user_states[uid] = STATE_REQUEST
+    elif state == STATE_EDUCATION:
+        user_data[uid]['education'] = text
+        bot.send_message(uid, "Есть ли у тебя определенный запрос на консультацию? (Если да, напиши нам его тут)")
+        user_states[uid] = STATE_REQUEST
 
-        elif state == STATE_REQUEST:
-            user_data[uid]['request'] = text
-            bot.send_message(uid, "Прикрепи ссылку на своё резюме, это поможет нам лучше понять твой кейс.")
-            user_states[uid] = STATE_RESUME_LINK
-            return
+    elif state == STATE_REQUEST:
+        user_data[uid]['request'] = text
+        bot.send_message(uid, "Ссылка на резюме (если есть, можно написать «нет» или поставить прочерк):")
+        user_states[uid] = STATE_RESUME_LINK
 
-        elif state == STATE_RESUME_LINK:
-            user_data[uid]['resume_link'] = text
-            markup = InlineKeyboardMarkup(row_width=1)
-            markup.add(
-                InlineKeyboardButton("Да, проверил(а)", callback_data="resume_checked")
-            )
-            bot.send_message(
-                uid,
-                "Проверь, точно ли открыт доступ на просмотр файла\n"
-                "Подтверди, что доступ открыт:",
-                reply_markup=markup
-            )
-            user_states[uid] = STATE_RESUME_CONFIRM
-            return
-
-        return
-
-    # Если текст не распознан — возвращаем в главное меню
-    send_main_menu_message(uid)
-
-
-def send_application(uid):
-    now = datetime.now().strftime("%d.%m.%Y %H:%M")
-
-    if uid not in user_data:
-        return
-
-    d = user_data[uid]
-    chat = bot.get_chat(uid)
-    username_str = f"@{chat.username}" if chat.username else f"ID {uid}"
-    first_name = chat.first_name or ""
-
-    resume_link = d.get('resume_link', '— не прикреплена')
-
-    text = (
-        f"❗️ НОВАЯ ЗАЯВКА НА КОНСУЛЬТАЦИЮ\n"
-        f"━━━━━━━━━━\n"
-        f"Дата и время: {now}\n"
-        f"От: {username_str} ({first_name})\n"
-        f"━━━━━━━━━━\n"
-        f"Тип консультации: {d.get('consult_type', '—')}\n"
-        f"Имя: {d.get('name', '—')}\n"
-        f"Опыт работы: {d.get('experience', '—')}\n"
-        f"Образование: {d.get('education', '—')}\n"
-        f"Запрос: {d.get('request', '—')}\n"
-        f"Ссылка на резюме: {resume_link}\n"
-        f"Желаемый консультант: {d.get('consultant', '—')}\n"
-        f"━━━━━━━━━━\n"
-    )
-
-    try:
-        bot.send_message(OWNER_CHAT_ID, text)
-    except Exception as e:
-        print(f"Ошибка отправки заявки: {e}")
-
-
-def send_community_join_notification(uid, now):
-    chat = bot.get_chat(uid)
-    username_str = f"@{chat.username}" if chat.username else f"ID {uid}"
-    first_name = chat.first_name or ""
-
-    text = (
-        f"💟 Запрос на вступление в комьюнити\n"
-        f"━━━━━━━━━\n"
-        f"Дата и время: {now}\n"
-        f"От: {username_str} ({first_name})\n"
-    )
-
-    try:
-        bot.send_message(OWNER_CHAT_ID, text)
-    except Exception as e:
-        print(f"Ошибка отправки уведомления о комьюнити: {e}")
+    elif state == STATE_RESUME_LINK:
+        user_data[uid]['resume_link'] = text if text.strip() and text.lower() != "нет" else "не указано"
+        access_text = (
+            "Если ты прикрепил ссылку, проверь, пожалуйста, открыт ли у тебя доступ для просмотра.\n\n"
+            "Если доступа нет — консультант не сможет посмотреть резюме."
+        )
+        markup = InlineKeyboardMarkup(row_width=2)
+        markup.add(
+            InlineKeyboardButton("Да, всё открыто", callback_data="resume_access_yes"),
+            InlineKeyboardButton("Не прикреплял", callback_data="resume_access_no")
+        )
+        bot.send_message(uid, access_text, reply_markup=markup)
+        user_states[uid] = STATE_RESUME_ACCESS_CHECK
 
 
 if __name__ == '__main__':
-    print("Бот 'Заработались' запущен...")
-    print("Заявки и запросы на комьюнити отправляются в группу")
-    bot.infinity_polling(timeout=10, long_polling_timeout=5)
+    print("Бот ЗАРАБОТАЛИСЬ запущен...")
+    bot.infinity_polling(
+        timeout=35,
+        long_polling_timeout=60,
+        allowed_updates=["message", "callback_query"],
+        skip_pending=True
+    )

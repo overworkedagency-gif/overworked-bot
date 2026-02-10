@@ -29,7 +29,7 @@ user_states = {}
 user_data = {}
 
 WELCOME_TEXT = (
-    "Привет! 🌿\n"
+    "Привет!\n"
     "Очень рада видеть тебя в <b>«Заработались»</b> 💛\n\n"
     "Это тёплое место, где мы говорим о карьере без выгорания.\n"
     "Обсуждаем , как расти профессионально, но при этом не выгорать, не ломать себя "
@@ -49,11 +49,12 @@ WELCOME_TEXT = (
 def get_main_menu_inline():
     markup = InlineKeyboardMarkup(row_width=2)
     markup.add(
-        InlineKeyboardButton("🫂 Сообщество", callback_data="menu_community")
+        InlineKeyboardButton("🫂 Сообщество", callback_data="menu_community"),
+        InlineKeyboardButton("🎯 Консультации", callback_data="menu_consult")
     )
     markup.add(
-        InlineKeyboardButton("🎯 Консультации", callback_data="menu_consult"),
-        InlineKeyboardButton("🎙️ Подкаст", callback_data="menu_podcast")
+        InlineKeyboardButton("🎙️ Подкаст", callback_data="menu_podcast"),
+        InlineKeyboardButton("🤝 Сотрудничество", callback_data="menu_collaboration")
     )
     return markup
 
@@ -80,9 +81,26 @@ def get_consult_format_inline():
 @bot.message_handler(commands=['start'])
 def cmd_start(message):
     uid = message.chat.id
-    bot.send_message(uid, WELCOME_TEXT)
-    send_main_menu(uid)
+    welcome_photo = "https://drive.google.com/uc?export=view&id=1s9R41fJOX93lSG8OgTZljDopGezlkEs9"
+    try:
+        bot.send_photo(
+            chat_id=uid,
+            photo=welcome_photo,                     # ← картинка
+            caption=WELCOME_TEXT,                    # ← текст под картинкой
+            parse_mode="HTML",                       # чтобы работали <b>, <i> и т.д.
+            disable_notification=False               # можно True, если хотите без звука
+        )
+    except Exception as e:
+        print(f"Не удалось отправить фото: {e}")
+        # Если фото не отправилось — отправляем просто текст
+        bot.send_message(
+            uid,
+            WELCOME_TEXT,
+            parse_mode="HTML"
+        )
 
+    # После приветствия сразу показываем главное меню
+    send_main_menu(uid)
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_handler(call):
@@ -97,13 +115,12 @@ def callback_handler(call):
     # Главное меню
     if data.startswith("menu_"):
         try:
-            bot.edit_message_reply_markup(uid, call.message.message_id, reply_markup=None)
+            bot.edit_message_reply_markup(chat_id=uid, message_id=call.message.message_id, reply_markup=None)
         except:
             pass
 
         if data == "menu_community":
-            photo_url = "https://drive.google.com/uc?export=view&id=1x797hV2NSdpwqUD7Ib_iEC63p4M7R5J9"
-            # Короткая подпись к фото (чтобы не превысить лимит 1024 символа)
+            photo_url = "https://drive.google.com/uc?export=view&id=1PvfsaqigBcVVEM4WmtYvfs0wNjY1wPU_"
             short_caption = "<b>«Заработались» — тёплое сообщество карьерной поддержки 🧡 </b>"
             community_text = (
                 "Здесь собрались специалисты из разных сфер и этапов — от джунов до опытных профи.\n\n "
@@ -120,25 +137,23 @@ def callback_handler(call):
                 "Если откликается — нам точно по пути 💛\n\n"
                 "<b> ⚡ Только до 1 мая — полностью бесплатный доступ ко всем функциям сообщества!</b>🔥\n"
             )
-            try:bot.send_photo(uid,photo=photo_url,caption=short_caption,parse_mode="HTML")
+            try:
+                bot.send_photo(uid, photo=photo_url, caption=short_caption, parse_mode="HTML")
             except Exception as e:
                 print(f"Ошибка отправки фото сообщества: {e}")
-                # Если фото не загрузилось — отправляем просто текст
                 bot.send_message(uid, short_caption, parse_mode="HTML")
 
-            # Отправляем полный текст описания
             bot.send_message(uid, community_text, parse_mode="HTML")
-            # Кнопки "Да, хочу вступить / Пока нет"
             markup = InlineKeyboardMarkup(row_width=2)
             markup.add(
                 InlineKeyboardButton("Да, хочу вступить", callback_data="community_join_yes"),
                 InlineKeyboardButton("Пока нет", callback_data="community_join_no")
-                )
+            )
             bot.send_message(uid, "Хочешь вступить в сообщество прямо сейчас?", reply_markup=markup)
             return
 
         elif data == "menu_podcast":
-            photo_url = "https://drive.google.com/uc?export=view&id=1AZAp0rpzOv_QgTyIOmhDXw1mcwYzL94z"
+            photo_url = "https://drive.google.com/uc?export=view&id=12VcTWSaCh0SZonPbEYp6VDyLUUDSfE5u"
             short_caption = "<b>«Заработались»</b> — подкаст, где мы говорим о работе без прикрас,обсуждаем достижения, провалы и, конечно, как не потерять себя в ежедневной гонке.\n\n"
             podcast_text = (
                 "В каждом выпуске болтаем с крутыми экспертами и практиками (IT, digital, менеджмент, психология, нейробиология, карьерные коучи) про самое живое:\n"
@@ -147,65 +162,30 @@ def callback_handler(call):
                 "🚀 ведение проектов — корпоративных и своих личных\n"
                 "🤝 баланс между бизнесом и человеческим фактором\n\n"
                 "Учимся вписывать амбиции в реальность рынка, расти без выгорания и делать себя главным проектом своей жизни.\n\n"
-                "<b>Включай, если чувствуешь: «Я окончательно заработался на своей любимой работе...»</b> 😅\n\n")
+                "<b>Включай, если чувствуешь: «Я окончательно заработался на своей любимой работе...»</b> 😅\n\n"
+            )
             try:
-                bot.send_photo(uid,photo=photo_url,caption=short_caption,parse_mode="HTML")
+                bot.send_photo(uid, photo=photo_url, caption=short_caption, parse_mode="HTML")
             except Exception as e:
                 print(f"Ошибка отправки фото подкаста: {e}")
                 bot.send_message(uid, short_caption, parse_mode="HTML")
 
             bot.send_message(uid, podcast_text, parse_mode="HTML")
 
-            # Кнопки со ссылками + "Обратно в меню"
             markup = InlineKeyboardMarkup(row_width=1)
             markup.add(
-                InlineKeyboardButton(
-                    "Слушать на Яндекс Музыке",
-                    url="https://music.yandex.com/album/33028086?dir=desc&activeTab=about"
-                )
+                InlineKeyboardButton("Слушать на Яндекс Музыке", url="https://music.yandex.com/album/33028086?dir=desc&activeTab=about"),
+                InlineKeyboardButton("Слушать на Apple Podcasts", url="https://podcasts.apple.com/ru/podcast/%D0%BA%D0%B5%D0%BC-%D1%8F-%D0%BC%D0%B5%D1%87%D1%82%D0%B0%D1%8E-%D1%81%D1%82%D0%B0%D1%82%D1%8C/id1764912319"),
+                InlineKeyboardButton("Смотреть на YouTube", url="https://www.youtube.com/@over_worked"),
+                InlineKeyboardButton("Смотреть на RuTube", url="https://rutube.ru/channel/47932583/"),
+                InlineKeyboardButton("Подписаться на Telegram-канал", url="https://t.me/overworked_community"),
+                InlineKeyboardButton("← Обратно в меню", callback_data="back_to_menu")
             )
-            markup.add(
-                InlineKeyboardButton(
-                    "Слушать на Apple Podcasts",
-                    url="https://podcasts.apple.com/ru/podcast/%D0%BA%D0%B5%D0%BC-%D1%8F-%D0%BC%D0%B5%D1%87%D1%82%D0%B0%D1%8E-%D1%81%D1%82%D0%B0%D1%82%D1%8C/id1764912319"
-                )
-            )
-            markup.add(
-                InlineKeyboardButton(
-                    "Смотреть на YouTube",
-                    url="https://www.youtube.com/@over_worked"
-                )
-            )
-            markup.add(
-                InlineKeyboardButton(
-                    "Смотреть на RuTube",
-                    url="https://rutube.ru/channel/47932583/"
-                )
-            )
-            markup.add(
-                InlineKeyboardButton(
-                    "Подписаться на Telegram-канал",
-                    url="https://t.me/overworked_community"
-                )
-            )
-            markup.add(
-                InlineKeyboardButton(
-                    "← Обратно в меню",
-                    callback_data="back_to_menu"   # или любое другое значение, которое уже обрабатывается
-                )
-            )
-
-            bot.send_message(
-                uid,
-                "Где удобно слушать/смотреть? 👇\n\nИли вернись в главное меню:",
-                reply_markup=markup
-            )
+            bot.send_message(uid, "Где удобно слушать/смотреть? 👇\n\nИли вернись в главное меню:", reply_markup=markup)
             return
 
         elif data == "menu_consult":
-            # Прямая ссылка на твою картинку
-            photo_url = "https://drive.google.com/uc?export=view&id=1Qgk4mc_02Wg2IK7E3fAOvUb5Wu9BPOux"
-            # Короткий caption к фото (до 1024 символов)
+            photo_url = "https://drive.google.com/uc?export=view&id=1NRlRUoVCIChBYhBHtWw0QFppdCynbp2B"
             short_caption = "Для начала — расскажем подробнее про форматы консультаций, чтобы ты выбрал(а) то, что даст максимальный результат:"
             consult_text =(
                 "✨ <b> Вариант 1 — Разбор резюме (документ с комментариями) — 2000 ₽</b>\n"
@@ -233,16 +213,12 @@ def callback_handler(call):
                 "• разбор сопроводительного письма (чтобы оно реально работало)\n"
                 "• тестовое HR-собеседование\n"
                 "• разбор стратегии поиска работы\n"
-                "• ответы на любые вопросы в течение 48 часов\n\n")
+                "• ответы на любые вопросы в течение 48 часов\n\n"
+            )
             try:
-                bot.send_photo(
-                uid,
-                photo=photo_url,
-                caption=short_caption,
-                parse_mode="HTML")
+                bot.send_photo(uid, photo=photo_url, caption=short_caption, parse_mode="HTML")
             except Exception as e:
                 print(f"Ошибка отправки фото: {e}")
-                # Если фото не загрузилось — отправляем просто текст
                 bot.send_message(uid, short_caption, parse_mode="HTML")
             bot.send_message(uid, consult_text, parse_mode="HTML")
             markup = InlineKeyboardMarkup(row_width=2)
@@ -253,10 +229,47 @@ def callback_handler(call):
             bot.send_message(uid, "Хочешь оставить заявку на консультацию?", reply_markup=markup)
             return
 
-    # Комьюнити: да/нет
+        elif data == "menu_collaboration":
+            photo_url = "https://drive.google.com/uc?export=view&id=1ncDx8bJRckx1IcFL6ewrcAA6L0x2eW5N"  # ← ВСТАВЬ СВОЮ ССЫЛКУ НА ФОТО
+
+            caption = "<b>Форматы сотрудничества с проектом «Заработались»</b>\n\n"  # ← можно поменять
+
+            try:
+                bot.send_photo(uid, photo=photo_url, caption=caption, parse_mode="HTML")
+            except Exception as e:
+                print(f"Ошибка отправки фото сотрудничества: {e}")
+                bot.send_message(uid, caption, parse_mode="HTML")
+
+            collaboration_text = (
+                "Мы открыты к партнёрствам и коллаборациям с экспертами, компаниями и медиа, которым близки темы карьеры, рынка труда и профессионального развития.\n\n"
+                "Делимся доступными форматами коллабораций:\n\n"
+                "<b>🎙 Запись эпизода подкаста «Заработались»</b>\n"
+                "Совместные выпуски с экспертами, представителями компаний и проектами. Обсуждаем карьерные треки, рынок труда, развитие специалистов и команд, а также смотрим на работу и карьерные решения через призму нейробиологии и психологии: мотивацию, выгорание, адаптацию, принятие решений и устойчивость в профессиональной среде.\n\n"
+                "<b>🎤 Участие в вашем проекте</b>\n"
+                "Будем рады присоединиться к вашему проекту в роли спикеров — в рамках подкаста, эфира, митапа, конференции или образовательной программы.\n\n"
+                "Поделимся практическим и аналитическим взглядом на карьерные стратегии, рост внутри компаний, смену ролей и переход в новую сферу, рынок труда и осознанное развитие карьеры. Работаем с реальными кейсами и адаптируем формат под аудиторию и цели проекта.\n\n"
+                "<b>📢 Ваша реклама в эпизоде подкаста или в сообществе карьерной поддержки</b> \n"
+                "Мы открыты к аккуратным и нативным интеграциям, которые будут полезны и релевантны нашей аудитории.\n\n"
+                "<b>По вопросам рекламы и сотрудничества:</b>\n"
+                "Аня @poliikarpova\n"
+                "Лера @valeria_brzn\n"
+                "Почта overworked.agency@gmail.com\n"
+            )
+
+            bot.send_message(uid, collaboration_text, parse_mode="HTML")
+
+            # Кнопка назад
+            markup = InlineKeyboardMarkup()
+            markup.add(
+                InlineKeyboardButton("← Назад в меню", callback_data="back_to_menu")
+            )
+            bot.send_message(uid, "Вернуться в главное меню?", reply_markup=markup)
+            return
+
+    # Сообщество: да / нет
     if data in ["community_join_yes", "community_join_no"]:
         try:
-            bot.edit_message_reply_markup(uid, call.message.message_id, reply_markup=None)
+            bot.edit_message_reply_markup(chat_id=uid, message_id=call.message.message_id, reply_markup=None)
         except:
             pass
 
@@ -291,7 +304,7 @@ def callback_handler(call):
         send_main_menu(uid)
         return
 
-    # Заявка — хочу / не хочу
+    # Заявка на консультацию — да / нет
     if data in ["want_consult_yes", "want_consult_no"]:
         if data == "want_consult_no":
             send_main_menu(uid)
@@ -309,7 +322,7 @@ def callback_handler(call):
         )
         return
 
-    # Выбор формата → сразу к имени (без ПД)
+    # Выбор формата консультации
     if data in ["consult_format_resume", "consult_format_interview", "consult_format_consultation", "consult_format_market"]:
         format_map = {
             "consult_format_resume": "Разбор резюме",
@@ -321,31 +334,45 @@ def callback_handler(call):
         user_data[uid]["consult_format"] = format_map[data]
 
         try:
-            bot.edit_message_reply_markup(uid, call.message.message_id, reply_markup=None)
+            bot.edit_message_reply_markup(chat_id=uid, message_id=call.message.message_id, reply_markup=None)
         except:
             pass
 
         bot.send_message(uid, "Подскажи, как к тебе можно обращаться?")
         user_states[uid] = STATE_NAME
         return
-        # Проверка доступа к резюме
+
+    # Проверка доступа к резюме
     if data in ["resume_access_yes", "resume_access_no"]:
+
         try:
             bot.edit_message_text(
                 "Отлично, спасибо что проверил(а) доступ!" if data == "resume_access_yes" else "Хорошо, тогда пропустим резюме.",
                 uid,
                 call.message.message_id
             )
-        except Exception:
+        except:
             bot.send_message(uid,
                              "Отлично, спасибо что проверил(а) доступ!" if data == "resume_access_yes" else "Хорошо, тогда пропустим резюме.")
 
         if data == "resume_access_no":
             user_data[uid]['resume_link'] = "не прикреплялось"
+        photo_consultants = "https://drive.google.com/uc?export=view&id=17qqmUeF2z7Qksca9kcK3EJnjX54Q8-Sz"  # ← вставь свою ссылку сюда!
+        caption_photo = "На данный момент консультации проводят Аня и Лера. Давай познакомим тебя с ними поближе:"
 
-        # Показываем выбор консультанта
+        try:
+            bot.send_photo(
+                uid,
+                photo=photo_consultants,
+                caption=caption_photo,
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            print(f"Ошибка отправки фото консультантов: {e}")
+            # Если фото не загрузилось — просто продолжаем без него
+            pass
+
         consultants_text = (
-            "На данный момент консультации проводят Аня и Лера. Давай познакомим тебя с ними поближе:\n\n"
             "<b>Аня</b> — руководитель проектов и HR в КванторФорм.\n"
             "Пишет курсы для менеджеров в Яндекс Практикуме, а также является ментором в программе «Women in Tech»\n"
             "Аня ведёт канал про менеджмент и поиск работы: @itspolikarpova — там рассказывает обо всём подробнее.\n"
@@ -396,7 +423,7 @@ def callback_handler(call):
         user_states[uid] = STATE_CONFIRM_APPLICATION
         return
 
-    # Подтверждение и отправка заявки
+    # Отправка заявки
     if data == "confirm_send_app":
         try:
             bot.delete_message(uid, call.message.message_id)
@@ -426,10 +453,7 @@ def callback_handler(call):
                 text=app_text,
                 message_thread_id=THREAD_CONSULT_APP
             )
-            bot.send_message(
-                uid,
-                "Заявка отправлена! Скоро мы с тобой свяжемся"
-            )
+            bot.send_message(uid, "Заявка отправлена! Скоро мы с тобой свяжемся 💛")
         except Exception as e:
             print(f"Ошибка отправки заявки: {e}")
             bot.send_message(uid, "Не удалось отправить заявку 😔\nНапиши /start и попробуй ещё раз.")
@@ -499,7 +523,7 @@ def handle_text(message):
 
 
 if __name__ == '__main__':
-    print("Бот ЗАРАБОТАЛИСЬ запущен...")
+    print("Бот «Заработались» запущен...")
     bot.infinity_polling(
         timeout=35,
         long_polling_timeout=60,

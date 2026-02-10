@@ -5,6 +5,16 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 import os
+
+
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+if BOT_TOKEN is None:
+    print("ОШИБКА: BOT_TOKEN не найден в .env!")
+    exit(1)
+
+print("Текущий BOT_TOKEN:", BOT_TOKEN[:15] + "...")  # покажет первые 15 символов
 load_dotenv()
 BOT_TOKEN = os.getenv('BOT_TOKEN')
 GROUP_CHAT_ID=os.getenv('GROUP_CHAT_ID')

@@ -3,14 +3,13 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from datetime import datetime
 
-BOT_TOKEN ="8453804590:AAFbFw4Y-AvCR2B-ZUZ638NStOhMcMEXxqM"
-
-GROUP_CHAT_ID = -1003589420810
-
-THREAD_PD_CONSENT     = 87   # согласие на рассылку / ПД
-THREAD_COMMUNITY_JOIN = 89   # вступление в сообщество
-THREAD_CONSULT_APP    = 88   # новая заявка на консультацию
-
+from dotenv import load_dotenv
+import os
+load_dotenv()
+BOT_TOKEN = os.getenv('BOT_TOKEN')
+GROUP_CHAT_ID=os.getenv('GROUP_CHAT_ID')
+THREAD_COMMUNITY_JOIN=os.getenv('THREAD_COMMUNITY_JOIN')
+THREAD_CONSULT_APP=os.getenv('THREAD_CONSULT_APP')
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
 
